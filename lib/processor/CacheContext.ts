@@ -1,32 +1,35 @@
-import { S3Client } from "@aws-sdk/client-s3";
-import { getCurrentTask } from "./TaskAware";
+import { S3Client } from '@aws-sdk/client-s3';
 
-interface CacheContext {
-  client: S3Client,
+export interface CacheContext {
+  client: S3Client;
 
-  prefix: string,
-  bucket: string,
-  branchName: string,
-  fallbackBranch: string | undefined,
-  project: string,
+  prefix: string;
+  bucket: string;
+  branchName: string;
+  fallbackBranch: string | undefined;
+  project: string;
 
   fallbackGitHash: string | undefined;
+  localCacheBuildFor: string[];
 }
 
-let cacheContext: CacheContext = {
-  bucket: '',
-  branchName: '',
-  client: null as any,
-  fallbackBranch: '',
-  fallbackGitHash: '',
-  prefix: '',
-  get project() {
-    return getCurrentTask()?.target.project;
+export interface CacheContextAware {
+  getCacheContext(): CacheContext | undefined;
+
+  setCacheContext(cacheContext: CacheContext): void;
+}
+
+export abstract class CacheContextAwareImpl implements CacheContextAware {
+  private _cacheContext: CacheContext | undefined;
+
+  getCacheContext(): CacheContext {
+    if (!this._cacheContext) {
+      throw new Error('No cache context available');
+    }
+    return this._cacheContext;
   }
-};
 
-export const getCacheContext = () => cacheContext;
-
-export const setCacheContext = (config: Partial<CacheContext>) => {
-  cacheContext = {...cacheContext, ...config};
+  setCacheContext(cacheContext: CacheContext) {
+    this._cacheContext = cacheContext;
+  }
 }

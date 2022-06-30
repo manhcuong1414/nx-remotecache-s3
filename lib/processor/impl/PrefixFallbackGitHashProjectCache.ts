@@ -1,13 +1,35 @@
-import { getFileByKey, isFileExisted } from "../../utils";
-import { getCacheContext } from "../CacheContext";
-import { ShouldStoreCacheImplementation } from "../type";
+import { getFileByKey, isFileExisted } from '../../utils';
+import { ShouldRetrieveCacheImplementation } from '../type';
+import { CacheContextAwareImpl } from '../CacheContext';
 
-const getKey = (filename: string) => `${getCacheContext().prefix}/git/${getCacheContext().branchName}/${getCacheContext().project}/${filename}`;
+export class PrefixFallbackGitHashProjectCache
+  extends CacheContextAwareImpl
+  implements ShouldRetrieveCacheImplementation
+{
+  private _name = 'PrefixFallbackGitHashProjectCache';
 
-export const PrefixFallbackGitHashProjectCache: ShouldStoreCacheImplementation = {
-  name: "PrefixFallbackGitHashProjectCache",
-  shouldStoreFile: () => false,
-  fileExists: async (filename) => !!getCacheContext().fallbackGitHash && isFileExisted(getCacheContext().client, getCacheContext().bucket, getKey(filename)),
-  retrieveFile: () => getFileByKey(getCacheContext().client, getCacheContext().bucket, getKey(getCacheContext().fallbackGitHash as string)),
-  storeFile: () => Promise.resolve()
-};
+  get name(): string {
+    return this._name;
+  }
+
+  async fileExists(): Promise<boolean> {
+    return (
+      !!this.getCacheContext().fallbackGitHash &&
+      isFileExisted(this.getCacheContext().client, this.getCacheContext().bucket, this.getKey())
+    );
+  }
+
+  retrieveFile(): Promise<NodeJS.ReadableStream> {
+    return getFileByKey(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey()
+    );
+  }
+
+  getKey(): string {
+    return `${this.getCacheContext().prefix}/git/${this.getCacheContext().branchName}/${
+      this.getCacheContext().project
+    }/${this.getCacheContext().fallbackGitHash}.tar.gz`;
+  }
+}

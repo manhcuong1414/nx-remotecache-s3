@@ -1,17 +1,52 @@
-import { getFileByKey, isFileExisted, uploadFile } from "../../utils";
-import { getCacheContext } from "../CacheContext";
-import simpleGit from "simple-git";
-import { ShouldStoreCacheImplementation } from "../type";
+import { getFileByKey, isFileExisted, uploadFile } from '../../utils';
+import { ShouldRetrieveCacheImplementation, ShouldStoreCacheImplementation } from '../type';
+import { CacheContextAwareImpl } from '../CacheContext';
+import simpleGit from 'simple-git';
+import { Readable } from 'stream';
 
-const getKey = (filename: string) => `${getCacheContext().prefix}/git/${getCacheContext().branchName}/${getCacheContext().project}/${filename}`;
+const getCurrentCommitHash = () => simpleGit().revparse('HEAD');
 
-export const PrefixGitHashProjectCache: ShouldStoreCacheImplementation = {
-  name: "PrefixGitHashProjectCache",
-  shouldStoreFile: () => true,
-  fileExists: async () => isFileExisted(getCacheContext().client, getCacheContext().bucket, getKey(await simpleGit().revparse("HEAD"))),
-  retrieveFile: async () => getFileByKey(getCacheContext().client, getCacheContext().bucket, getKey(await simpleGit().revparse("HEAD"))),
-  storeFile: async (_, stream) => {
-    const commitHash = await simpleGit().revparse("HEAD");
-    await uploadFile(getCacheContext().client, getCacheContext().bucket, `${getCacheContext().prefix}/git/${getCacheContext().project}/${commitHash}.tar.gz`, stream);
+export class PrefixGitHashProjectCache
+  extends CacheContextAwareImpl
+  implements ShouldStoreCacheImplementation, ShouldRetrieveCacheImplementation
+{
+  private _name = 'PrefixGitHashProjectCache';
+  get name(): string {
+    return this._name;
   }
-};
+
+  async fileExists(): Promise<boolean> {
+    return isFileExisted(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(await getCurrentCommitHash())
+    );
+  }
+
+  async retrieveFile(): Promise<NodeJS.ReadableStream> {
+    return getFileByKey(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(await getCurrentCommitHash())
+    );
+  }
+
+  getKey(filename: string | undefined): string {
+    return `${this.getCacheContext().prefix}/git/${this.getCacheContext().branchName}/${
+      this.getCacheContext().project
+    }/${filename}.tar.gz`;
+  }
+
+  async storeFile(_: string | undefined, stream: Readable): Promise<void> {
+    await uploadFile(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(await getCurrentCommitHash()),
+      stream
+    );
+  }
+
+  shouldStoreFile(): boolean {
+    return true;
+  }
+}

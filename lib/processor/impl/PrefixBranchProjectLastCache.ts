@@ -1,13 +1,36 @@
-import { getLatestFileInAFolder, hasLatestFileInAFolder } from "../../utils";
-import { getCacheContext } from "../CacheContext";
-import { ShouldStoreCacheImplementation } from "../type";
+import { getLatestFileInAFolder, hasLatestFileInAFolder } from '../../utils';
+import { CacheContextAwareImpl } from '../CacheContext';
+import { ShouldRetrieveCacheImplementation } from '../type';
 
-const getKey = () => `${getCacheContext().prefix}/${getCacheContext().branchName}/${getCacheContext().project}`;
+export class PrefixBranchProjectLastCache
+  extends CacheContextAwareImpl
+  implements ShouldRetrieveCacheImplementation
+{
+  private _name = 'PrefixBranchProjectLastCache';
 
-export const PrefixBranchProjectLastCache: ShouldStoreCacheImplementation = {
-  name: "PrefixBranchProjectLastCache",
-  shouldStoreFile: () => false,
-  fileExists: () => hasLatestFileInAFolder(getCacheContext().client, getCacheContext().bucket, getKey()),
-  retrieveFile: () => getLatestFileInAFolder(getCacheContext().client, getCacheContext().bucket, getKey()),
-  storeFile: () => Promise.resolve()
-};
+  get name(): string {
+    return this._name;
+  }
+
+  async fileExists(): Promise<boolean> {
+    return hasLatestFileInAFolder(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey()
+    );
+  }
+
+  retrieveFile(): Promise<NodeJS.ReadableStream> {
+    return getLatestFileInAFolder(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey()
+    );
+  }
+
+  getKey(): string {
+    return `${this.getCacheContext().prefix}/${this.getCacheContext().branchName}/${
+      this.getCacheContext().project
+    }`;
+  }
+}

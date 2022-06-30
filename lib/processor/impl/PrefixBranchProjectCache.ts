@@ -1,13 +1,50 @@
-import { getFileByKey, isFileExisted, uploadFile } from "../../utils";
-import { getCacheContext } from "../CacheContext";
-import { ShouldStoreCacheImplementation } from "../type";
+import { getFileByKey, isFileExisted, uploadFile } from '../../utils';
+import { CacheContextAwareImpl } from '../CacheContext';
+import { ShouldRetrieveCacheImplementation, ShouldStoreCacheImplementation } from '../type';
+import { Readable } from 'stream';
 
-const getKey = (filename: string) => `${getCacheContext().prefix}/${getCacheContext().branchName}/${getCacheContext().project}/${filename}`;
+export class PrefixBranchProjectCache
+  extends CacheContextAwareImpl
+  implements ShouldRetrieveCacheImplementation, ShouldStoreCacheImplementation
+{
+  private _name = 'PrefixBranchProjectCache';
 
-export const PrefixBranchProjectCache: ShouldStoreCacheImplementation = {
-  name: "PrefixBranchProjectCache",
-  shouldStoreFile: () => true,
-  fileExists: (filename) => isFileExisted(getCacheContext().client, getCacheContext().bucket, getKey(filename)),
-  storeFile: (filename, stream) => uploadFile(getCacheContext().client, getCacheContext().bucket, getKey(filename), stream),
-  retrieveFile: (filename) => getFileByKey(getCacheContext().client, getCacheContext().bucket, getKey(filename))
-};
+  get name(): string {
+    return this._name;
+  }
+
+  async fileExists(filename: string | undefined): Promise<boolean> {
+    return isFileExisted(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(filename)
+    );
+  }
+
+  retrieveFile(filename: string | undefined): Promise<NodeJS.ReadableStream> {
+    return getFileByKey(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(filename)
+    );
+  }
+
+  getKey(filename: string | undefined): string {
+    return `${this.getCacheContext().prefix}/${this.getCacheContext().branchName}/${
+      this.getCacheContext().project
+    }/${filename}`;
+  }
+
+  storeFile(filename: string, stream: Readable): Promise<unknown> {
+    return uploadFile(
+      this.getCacheContext().client,
+      this.getCacheContext().bucket,
+      this.getKey(filename),
+      stream
+    );
+  }
+
+  shouldStoreFile(): boolean {
+    return true;
+  }
+}
